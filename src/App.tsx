@@ -96,10 +96,10 @@ const App = () => {
 	useEffect(() => {
     console.log(process.env)
 		async function fetchData() {
-      /*
-			const user = await bridge.send('VKWebAppGetUserInfo');
-			setUser(user);
-      */
+      if (document.location.hostname !== 'localhost') {
+        const user = await bridge.send('VKWebAppGetUserInfo');
+        setUser(user);
+      }
 			setPopout(null);
 		}
 		fetchData();
