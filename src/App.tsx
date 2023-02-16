@@ -14,7 +14,8 @@ import {
   CellButton,
   Alert,
   Checkbox,
-  Placeholder
+  Placeholder,
+  Link
 } from '@vkontakte/vkui'
 
 import {
@@ -25,7 +26,9 @@ import {
   Icon24Chevron,
   Icon20CopyOutline,
   Icon28DeleteOutline,
-  Icon56WalletOutline
+  Icon56WalletOutline,
+  Icon56CheckCircleOutline,
+  Icon24ExternalLinkOutline
 } from '@vkontakte/icons'
 import '@vkontakte/vkui/dist/vkui.css'
 
@@ -44,10 +47,12 @@ import fetchNFTInfo from "./helpers/fetchNFTInfo"
 
 const EVM_ADDRESS_REGEXP = /^0x[A-Fa-f0-9]{40}$/
 const isEvmAddress = (value) => typeof value === 'string' && EVM_ADDRESS_REGEXP.test(value)
+import { BigNumber } from 'bignumber.js'
+
 
 const App = () => {
 
-	const [activePanel, setActivePanel] = useState('loading');
+	const [activePanel, setActivePanel] = useState('loading')
 	const [fetchedUser, setUser] = useState(null);
 	const [popout, setPopout] = useState(<ScreenSpinner size='large' state="loading" />)
   
@@ -55,6 +60,9 @@ const App = () => {
 
   const chainId = process.env.REACT_APP_CHAIN_ID
   const mintChainInfo = CHAIN_INFO(chainId)
+  const mintChainDecimals = mintChainInfo.nativeCurrency.decimals
+  const mintChainSymbol = mintChainInfo.nativeCurrency.symbol
+  
   const nftDropContractAddress = process.env.REACT_APP_CONTRACT_ADDRESS
   
   const [activeChainId, setActiveChainId] = useState(false)
@@ -68,6 +76,7 @@ const App = () => {
   const [ nftInfoFetched, setNftInfoFetched ] = useState(false)
 
   const [ isLoaded, setIsLoaded ] = useState(false)
+
 
   useEffect(() => {
     if (isLoaded) clearPopout()
@@ -355,116 +364,170 @@ const App = () => {
     );
   }
   
-  const _doMintNFT = () => {
+  const _doMintNFT = async () => {
     
-    setIsMinting(false)
-    setMintTx(false)
-    setTxMintError(false)
-    
-    setIsImageUpload(true)
-    setIsImageUploadError(false)
-    setIsImageUploaded(false)
-    
-    setIsJsonUpload(false)
-    setIsJsonUploaded(false)
-    setIsJsonUploadError(false)
-    
-    setIsMintShow(true)
+    const mintParams = {
+      activeWeb3,
+      contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS,
+      method: 'mint',
+      weiAmount: nftInfo.NFTStakeInfo.mintOwnPrice,
+      args: [
+        (nftOtherOwner) ? nftOwner : activeAddress,
+        `ipfs://QmbYNvHNaDUBVLVfatqMdMfvocFzG4pUNkMxgumJZU6gET`
+      ],
+    }
 
-    setPopout(<ScreenSpinner state="loading" />)
 
-    setMintStep(1)
+    const checkPrice = await callNftMethod({
+      ...mintParams,
+      calcPrice: true
+    })
 
-    IpfsUpload(nftImageDataBuffer).then((imageCid) => {
-      console.log('>>> cid', imageCid)
-      setImageUploadedCID(imageCid)
-      const json = {
-        name: nftName,
-        description: nftDesc,
-        image: `ipfs://${imageCid}`,
-      }
-      setIsImageUpload(false)
-      setIsImageUploaded(true)
-      setIsJsonUpload(true)
-      setMintStep(2)
-      IpfsUpload(JSON.stringify(json)).then((jsonCID) => {
-        setIsJsonUpload(false)
-        setIsJsonUploaded(true)
-        setJsonUploadedCID(jsonCID)
-        console.log('>>> json CID', jsonCID)
-        setIsMinting(true)
-        setMintStep(3)
-        callNftMethod({
-          activeWeb3,
-          contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS,
-          method: 'mint',
-          weiAmount: nftInfo.NFTStakeInfo.mintOwnPrice,
-          args: [
-            (nftOtherOwner) ? nftOwner : activeAddress,
-            `ipfs://${jsonCID}`
-          ],
-          onSuccess: () => {
-            console.log('>>> onSuccess')
-            setMintStep(4)
-          },
-          onTrx: (txHash) => {
-            console.log('>> onTrx', txHash)
-            setMintStep(5)
-            setMintTx(txHash)
-          },
-          onError: (err) => {
-            console.log('>> onError', err)
-            setMintError(true)
-            setTxMintError(true)
-            setPopout(<ScreenSpinner state="error" aria-label="Произошла ошибка" />)
-            setTimeout(clearPopout, 1000)
-          },
-          onFinally: (answer) => {
-            console.log('>> onFinally', answer)
-            if (
-              answer?.events?.Mint?.returnValues?.tokenUri
-              && answer?.events?.Mint?.returnValues?.tokenId
-            ) {
-              const {
-                tokenId,
-                tokenUri,
-              } = answer.events.Mint.returnValues
+    const _mint = () => {
+      setIsMinting(false)
+      setMintTx(false)
+      setTxMintError(false)
+      
+      setIsImageUpload(true)
+      setIsImageUploadError(false)
+      setIsImageUploaded(false)
+      
+      setIsJsonUpload(false)
+      setIsJsonUploaded(false)
+      setIsJsonUploadError(false)
+      
+      setIsMintShow(true)
 
-              setMintedNft({
-                tokenId,
-                tokenUri,
-                txHash: mintTx,
-              })
+      setPopout(<ScreenSpinner state="loading" />)
+
+      setMintStep(1)
+
+      IpfsUpload(nftImageDataBuffer).then((imageCid) => {
+        console.log('>>> cid', imageCid)
+        setImageUploadedCID(imageCid)
+        const json = {
+          name: nftName,
+          description: nftDesc,
+          image: `ipfs://${imageCid}`,
+        }
+        setIsImageUpload(false)
+        setIsImageUploaded(true)
+        setIsJsonUpload(true)
+        setMintStep(2)
+        IpfsUpload(JSON.stringify(json)).then((jsonCID) => {
+          setIsJsonUpload(false)
+          setIsJsonUploaded(true)
+          setJsonUploadedCID(jsonCID)
+          console.log('>>> json CID', jsonCID)
+          setIsMinting(true)
+          setMintStep(3)
+          
+          callNftMethod({
+            ...mintParams,
+            onSuccess: () => {
+              console.log('>>> onSuccess')
+              setMintStep(4)
+            },
+            onTrx: (txHash) => {
+              console.log('>> onTrx', txHash)
+              setMintStep(5)
+              setMintTx(txHash)
+            },
+            onError: (err) => {
+              // Transaction was not mined within 50 blocks, please make sure your transaction was properly sent. Be aware that it might still be mined!
+              console.log('>> onError', err)
+              const _isBlockchainBusy = err.message.startsWith(`Transaction was not mined within 50 blocks`)
+              console.log('>>>> _isBlockchainBusy', _isBlockchainBusy)
+              setMintError(true)
+              setTxMintError(err.message)
+              setPopout(<ScreenSpinner state="error" aria-label="Произошла ошибка" />)
+              setTimeout(clearPopout, 1000)
+            },
+            onFinally: (answer) => {
+              console.log('>> onFinally', answer)
+              if (
+                answer?.events?.Mint?.returnValues?.tokenUri
+                && answer?.events?.Mint?.returnValues?.tokenId
+              ) {
+                const {
+                  tokenId,
+                  tokenUri,
+                } = answer.events.Mint.returnValues
+
+                setMintedNft({
+                  tokenId,
+                  tokenUri,
+                  txHash: mintTx,
+                })
+              }
+              setIsMinting(false)
+              setIsMinted(true)
+              setMintStep(6)
+              setPopout(<ScreenSpinner state="done" aria-label="Успешно" />)
+              setTimeout(() => {
+                setActivePanel('mintedNft')
+                clearPopout()
+                resetMintForm()
+              }, 2000)
             }
-            setIsMinting(false)
-            setIsMinted(true)
-            setMintStep(6)
-            setPopout(<ScreenSpinner state="done" aria-label="Успешно" />)
-            setTimeout(() => {
-              setActivePanel('mintedNft')
-              clearPopout()
-              resetMintForm()
-            }, 2000)
-          }
+          })
+        }).catch((err) => {
+          console.log('err', err)
+          setIsJsonUpload(false)
+          setIsJsonUploadError(true)
+          setIsMinting(false)
+          setMintError(true)
+          setPopout(<ScreenSpinner state="error" aria-label="Произошла ошибка" />)
+          setTimeout(clearPopout, 1000)
         })
       }).catch((err) => {
-        console.log('err', err)
-        setIsJsonUpload(false)
-        setIsJsonUploadError(true)
+        console.log('>>> err', err)
+        setIsImageUploadError(true)
+        setIsImageUpload(false)
         setIsMinting(false)
         setMintError(true)
         setPopout(<ScreenSpinner state="error" aria-label="Произошла ошибка" />)
         setTimeout(clearPopout, 1000)
       })
-    }).catch((err) => {
-      console.log('>>> err', err)
-      setIsImageUploadError(true)
-      setIsImageUpload(false)
-      setIsMinting(false)
-      setMintError(true)
-      setPopout(<ScreenSpinner state="error" aria-label="Произошла ошибка" />)
-      setTimeout(clearPopout, 1000)
-    })
+    }
+    
+    if ((new BigNumber(checkPrice).isGreaterThan(accountBalance))) {
+      setPopout(
+        <Alert
+          actions={[
+            {
+              title: 'Попробовать создать NFT',
+              mode: 'default',
+              autoClose: true,
+              action: () => {
+                _mint()
+              }
+            },
+            {
+              title: 'Отмена',
+              autoClose: true,
+              mode: 'cancel',
+            },
+          ]}
+          actionsLayout="vertical"
+          onClose={clearPopout}
+          header="Подтвердите действие"
+          text={
+            <>
+              <Div>Внимание. У вас на балансе может не хватить монет для оплаты коммисии блокчейна</Div>
+              <Div>Примерная стоимость транзакции:</Div>
+              <Div><strong>{fromWei(checkPrice, mintChainDecimals)} {mintChainSymbol}</strong></Div>
+              <Div>Баланс Вашего кошелька:</Div>
+              <Div><strong>{fromWei(accountBalance, mintChainDecimals)} {mintChainSymbol}</strong></Div>
+              <Div>Вы можете попробовать отправить транзакцию в блокчейн, но её доставка не гарантированна</Div>
+            </>
+          }
+        />,
+      );
+    } else {
+      _mint()
+    }
+    
   }
   
   const goTo = (panelId) => {
@@ -605,11 +668,18 @@ const App = () => {
                     <Group>
                       <FormLayout>
                         {mintError && (
-                          <FormStatus header="При создании NFT произошла ошибка" mode="error">
-                            {isImageUploadError && (`Не удалось загрузить изображение в IPFS`)}
-                            {isJsonUploadError && (`Не удалось загрузить метаданые в IPFS`)}
-                            {txMintError && (`Произошла ошибка при создании транзкции`)}
-                          </FormStatus>
+                          <>
+                            <FormStatus header="При создании NFT произошла ошибка" mode="error">
+                              {isImageUploadError && (`Не удалось загрузить изображение в IPFS`)}
+                              {isJsonUploadError && (`Не удалось загрузить метаданые в IPFS`)}
+                              {txMintError && (`Произошла ошибка при создании транзкции`)}
+                            </FormStatus>
+                            {txMintError && (
+                              <FormStatus header="Ошибка при обработке транзакции" mode="error">
+                                {txMintError}
+                              </FormStatus>
+                            )}
+                          </>
                         )}
                         <FormItem top={`Создание NFT: ${MintSteps[mintStep].title}`}>
                           <Progress aria-labelledby="progresslabel" value={MintSteps[mintStep].progress} />
@@ -629,8 +699,26 @@ const App = () => {
                   <PanelHeader
                     before={<PanelHeaderBack onClick={() => { goTo('mintNFT') }} />}
                   >
-                    Информация о созданной NFT
+                    NFT Создана
                   </PanelHeader>
+                  <Group>
+                    <Placeholder
+                      icon={<Icon56CheckCircleOutline />}
+                      header={`NFT #${mintedNFT.tokenId} успещно создана!`}
+                      action={
+                        <>
+                          <Div>
+                            <Link href={`${mintChainInfo.blockExplorerUrls[0]}/tx/${mintedNFT.txHash}`} target="_blank">
+                              Посмотреть транзакцию в блокчейн-эксплорере <Icon24ExternalLinkOutline width={16} height={16} />
+                            </Link>
+                          </Div>
+                          <Button size="m" onClick={() => { goTo('mintNFT') }}>Вернуться назад</Button>
+                        </>
+                      }
+                    >
+                      Через минут 10 ваша NFT появится в вашей колекции
+                    </Placeholder>
+                  </Group>
                 </Panel>
                 <Panel id='imagePreview'>
                   <PanelHeader
@@ -643,8 +731,8 @@ const App = () => {
                     {`
                       .nftImagePreview {
                         display: block;
-                        max-width: 480px;
-                        width: 100%;
+                        max-width: 1024px;
+                        width: auto;
                         margin: 0 auto;
                         border-radius: 10px;
                       }
@@ -684,10 +772,6 @@ const App = () => {
                     </FormLayout>
                   </Group>
                 </Panel>
-                {/*
-								<Home id='home' fetchedUser={fetchedUser} go={go} />
-								<Persik id='persik' go={go} />
-                */}
 							</View>
 						</SplitCol>
 					</SplitLayout>
