@@ -4,3 +4,4 @@ node_modules/
 .env.development
 build.zip
 build/
+.env.production
