@@ -97,15 +97,11 @@ const App = () => {
   }, [ activeChainId, isLoaded, activeAddress ])
   
   const initOnWeb3Ready = async () => {
-    console.log('>>> initOnWeb3Ready', activeWeb3, `${activeChainId}`, `${chainId}`)
     if (activeWeb3 && (`${activeChainId}` == `${chainId}`)) {
-    
       activeWeb3.eth.getAccounts().then((accounts) => {
         setActiveAddress(accounts[0])
-        console.log('>>> setActiveAddress', accounts)
         
         fetchNFTInfo(nftDropContractAddress, chainId).then((_nftInfo) => {
-          console.log('>>> nft info fetched', _nftInfo)
           setNftInfo(_nftInfo)
           setNftInfoFetched(true)
         }).catch((err) => {
@@ -141,7 +137,6 @@ const App = () => {
             mode: 'destructive',
             autoClose: true,
             action: () => {
-              console.log('>>> do disconnect wallet')
               doDisconnectWallet()
               setActiveAddress(false)
             }
@@ -239,7 +234,7 @@ const App = () => {
   useEffect(() => {
     let fileReader, isCancel = false
     let fileReaderBuffer, isCancelBuffer = false
-    console.log('>>> nftImage', nftImage)
+
     if (nftImage) {
       fileReader = new FileReader()
       fileReader.onload = (e) => {
@@ -339,30 +334,80 @@ const App = () => {
     if (nftName === ``) return
     if (nftImageDataBuffer === null) return
     if (nftOtherOwner && !isEvmAddress(nftOwner)) return
-    setPopout(
-      <Alert
-        actions={[
-          {
-            title: 'Создать NFT',
-            mode: 'default',
-            autoClose: true,
-            action: () => {
-              _doMintNFT()
+    if (new BigNumber(accountBalance).isGreaterThan(0)) {
+      setPopout(
+        <Alert
+          actions={[
+            {
+              title: 'Создать NFT',
+              mode: 'default',
+              autoClose: true,
+              action: () => {
+                _doMintNFT()
+              }
+            },
+            {
+              title: 'Отмена',
+              autoClose: true,
+              mode: 'cancel',
+            },
+          ]}
+          actionsLayout="vertical"
+          onClose={clearPopout}
+          header="Подтвердите действие"
+          text="Создать NFT-токен?"
+        />,
+      )
+    } else {
+      setPopout(
+        <Alert
+          actions={[
+            {
+              title: 'Ок',
+              mode: 'cancel',
+              autoClose: true,
             }
-          },
-          {
-            title: 'Отмена',
-            autoClose: true,
-            mode: 'cancel',
-          },
-        ]}
-        actionsLayout="vertical"
-        onClose={clearPopout}
-        header="Подтвердите действие"
-        text="Создать NFT-токен?"
-      />,
-    );
+          ]}
+          actionsLayout="vertical"
+          onClose={clearPopout}
+          header="Нулевой баланс крипто-кошелека"
+          text={(
+            <>
+              <Div>Вы не сможете оплатить коммисию блокчейна.</Div>
+            </>
+          )}
+        />,
+      )
+    }
   }
+
+  const [ mintPrice , setMintPrice ] = useState(false)
+  
+  useEffect(() => {
+    if (activeAddress && nftInfo && activeWeb3 && nftInfo?.NFTStakeInfo?.mintOwnPrice) {
+      const mintParams = {
+        activeWeb3,
+        contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS,
+        method: 'mint',
+        weiAmount: nftInfo.NFTStakeInfo.mintOwnPrice,
+        args: [
+          (nftOtherOwner) ? nftOwner : activeAddress,
+          `ipfs://QmbYNvHNaDUBVLVfatqMdMfvocFzG4pUNkMxgumJZU6gET`
+        ],
+      }
+
+
+      callNftMethod({
+        ...mintParams,
+        calcPrice: true
+      }).then((_price) => {
+        setMintPrice(_price)
+      }).catch((err) => {
+        // 0.01 mint fee
+        setMintPrice(new BigNumber(nftInfo.NFTStakeInfo.mintOwnPrice).plus(50000000000000000).toFixed())
+      })
+    }
+  }, [ activeAddress, nftInfo, activeWeb3 ])
   
   const _doMintNFT = async () => {
     
@@ -422,6 +467,7 @@ const App = () => {
           setIsMinting(true)
           setMintStep(3)
           
+          let _txHash
           callNftMethod({
             ...mintParams,
             onSuccess: () => {
@@ -431,6 +477,7 @@ const App = () => {
             onTrx: (txHash) => {
               console.log('>> onTrx', txHash)
               setMintStep(5)
+              _txHash = txHash
               setMintTx(txHash)
             },
             onError: (err) => {
@@ -457,7 +504,7 @@ const App = () => {
                 setMintedNft({
                   tokenId,
                   tokenUri,
-                  txHash: mintTx,
+                  txHash: _txHash,
                 })
               }
               setIsMinting(false)
@@ -611,7 +658,7 @@ const App = () => {
                               onClick={() => { goTo('imagePreview') }}
                             >
                               <Image.Overlay>
-                                <Icon28Search />
+                                <Icon28Search width={32} height={32} />
                               </Image.Overlay>
                             </Image>
                           </FormItem>
@@ -656,6 +703,15 @@ const App = () => {
                             />
                           </FormItem>
                         )}
+                        <FormItem
+                          top="Примерная стоимость минта (Зависит от загруженности сети и стоимости газа)"
+                        >
+                          {mintPrice ? (
+                            <span>{fromWei(mintPrice, mintChainDecimals)} {mintChainSymbol}</span>
+                          ) : (
+                            <span>Расчет стоимости</span>
+                          )}
+                        </FormItem>
                         <FormItem>
                           <Button disabled={mintDisabled} size="l" stretched onClick={doMintNFT}>
                             Создать NFT
