@@ -3,6 +3,7 @@ import {
   INFURA_API_ENDPOINT
 } from "../../appconfig/ipfsInfura"
 
+
 import { create as ipfsHttpClient } from "ipfs-http-client"
 
 const InfuraIPFS = ipfsHttpClient({

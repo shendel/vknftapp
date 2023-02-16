@@ -1,4 +1,4 @@
-import NftContractData from "../contracts/source/artifacts/StakeNFT.json"
+import NftContractData from "./StakeNFT.json"
 import Web3 from 'web3'
 import { calcSendArgWithFee } from "./calcSendArgWithFee"
 import { BigNumber } from 'bignumber.js'
