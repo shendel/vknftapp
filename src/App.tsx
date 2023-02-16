@@ -28,7 +28,8 @@ import {
   Icon28DeleteOutline,
   Icon56WalletOutline,
   Icon56CheckCircleOutline,
-  Icon24ExternalLinkOutline
+  Icon24ExternalLinkOutline,
+  Icon16DeleteOutline
 } from '@vkontakte/icons'
 import '@vkontakte/vkui/dist/vkui.css'
 
@@ -48,6 +49,8 @@ import fetchNFTInfo from "./helpers/fetchNFTInfo"
 const EVM_ADDRESS_REGEXP = /^0x[A-Fa-f0-9]{40}$/
 const isEvmAddress = (value) => typeof value === 'string' && EVM_ADDRESS_REGEXP.test(value)
 import { BigNumber } from 'bignumber.js'
+
+//import PanelMintNft from './panels/PanelMintNft'
 
 
 const App = () => {
@@ -196,6 +199,10 @@ const App = () => {
     connectToProvider('INJECTED')
   }
 
+  const connectWithWalletConnect = async () => {
+    connectToProvider('WALLETCONNECT')
+  }
+  
   onWalletChanged((newAccount) => {
     setActiveAddress(newAccount)
   })
@@ -599,7 +606,16 @@ const App = () => {
                     <Placeholder
                       icon={<Icon56WalletOutline />}
                       header="Не верная сеть блокчейна"
-                      action={<Button size="m" onClick={handleSwitchNetwork}>Сменить сеть</Button>}
+                      action={
+                        <>
+                          <Div>
+                            <Button size="m" onClick={handleSwitchNetwork}>Сменить сеть</Button>
+                          </Div>
+                          <Div>
+                            <Button size="m" before={<Icon16DeleteOutline />} mode="danger" onClick={handleDisconnectWallet}>Отвязать кошелек</Button>
+                          </Div>
+                        </>
+                      }
                     >
                       Приложение работает на блокчейне <strong>{mintChainInfo.chainName} ({mintChainInfo.chainId})</strong>
                     </Placeholder>
@@ -615,6 +631,14 @@ const App = () => {
                       }
                     </Button>
                   </Div>
+                  <Div>
+                    <Button onClick={connectWithWalletConnect}>
+                      {isWalletConecting
+                        ? `Подключаем крипто-кошелек...`
+                        : `Подключить WalletConnect`
+                      }
+                    </Button>
+                  </Div>
                 </Panel>
                 <Panel id='mintNFT'>
                   <PanelHeader>Создание NFT токена</PanelHeader>
@@ -625,7 +649,7 @@ const App = () => {
                         before={<Icon56WalletOutline />}
                         subtitle={accountBalanceFetching
                           ? `Загрузка баланса`
-                          : `Баналс: ${fromWei(accountBalance, mintChainInfo.nativeCurrency.decimals)} ${mintChainInfo.nativeCurrency.symbol}`
+                          : `Баланс: ${fromWei(accountBalance, mintChainInfo.nativeCurrency.decimals)} ${mintChainInfo.nativeCurrency.symbol}`
                         }
                         after={<Icon24Chevron />}
                       >
