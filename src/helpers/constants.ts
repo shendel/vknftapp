@@ -87,7 +87,7 @@ export const AVAILABLE_NETWORKS_INFO = [
     chainName: 'Polygon',
     chainId: '0x89',
     networkVersion: 137,
-    rpcUrls: ['https://rpc-mainnet.maticvigil.com'],
+    rpcUrls: ['https://polygon-rpc.com', 'https://rpc-mainnet.maticvigil.com'],
     blockExplorerUrls: ['https://polygonscan.com'],
     isTestnet: false,
     nativeCurrency: CURRENCIES.MATIC
