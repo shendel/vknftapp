@@ -1,5 +1,10 @@
 import Web3 from 'web3'
 import { AVAILABLE_NETWORKS_INFO } from './constants'
+import Web3Connect from '../web3connect'
+import SUPPORTED_PROVIDERS from '../web3connect/providers/supported'
+import { CHAIN_INFO } from './constants'
+
+let web3connect = null
 
 const switchOrAddChain = (neededChainId) => {
   const {
@@ -61,6 +66,12 @@ const getCurrentChainId = (needChainId) => {
 }
 
 const setupWeb3 = () => new Promise((resolve, reject) => {
+  if (web3connect) {
+    console.log('>>> setupWeb3', web3connect)
+  }
+})
+  
+const setupWeb3_ = () => new Promise((resolve, reject) => {
   if (window.ethereum) {
     // @ts-ignore
     const activeChainId = window.ethereum && window.ethereum.networkVersion
@@ -88,62 +99,112 @@ const setupWeb3 = () => new Promise((resolve, reject) => {
   }
 })
 
-const doConnectWithMetamask = async (options) => {
+const isWalletConnected = () => web3connect?.isConnected()
+
+const doDisconnectWallet = () => {
+  return new Promise(async (resolved) => {
+    if (isWalletConnected()) {
+      await web3connect.Disconnect()
+      resolved(true)
+    } else {
+      resolved(true)
+    }
+  })
+}
+
+const initWeb3Connector = async (options) => {
   const {
     onBeforeConnect,
     onConnected,
+    onDisconnect,
     onError,
     onSetActiveChain,
     onSetActiveWeb3,
+    onChainChange,
+    onAccountChange,
+    onReady,
     needChainId,
   } = options
 
-  if (onBeforeConnect) onBeforeConnect()
+  const _chainInfo = CHAIN_INFO(needChainId)
+
+  const _web3connect = {
+    web3ChainId: _chainInfo.networkVersion,
+    web3RPC: {
+      [_chainInfo.networkVersion]: _chainInfo.rpcUrls[0],
+    },
+  }
+
+  web3connect = new Web3Connect(_web3connect)
+
+  window.web3connect = web3connect
   
-  try {
-    await window.ethereum.enable()
-    setupWeb3().then(async (answer) => {
-      const {
-        activeChainId, web3
-      } = answer
+  web3connect.on('connected', () => {
+    if (onBeforeConnect) onBeforeConnect()
+    const activeChain = web3connect.getNetworksId()
+    console.log('web3connect > on connected', activeChain)
+    const activeChainId = activeChain.dicimalCachedId
+    
+    let _web3: EthereumProvider | false = false
+
+    try {
+      _web3 = web3connect.getWeb3()
+    } catch (err) {
+      web3connect.clearCache()
+      return
+    }
+    
+    if (onConnected) onConnected(activeChainId, _web3)
+    if (onSetActiveChain) onSetActiveChain(activeChainId)
+  })
+
+  web3connect.on('disconnect', () => {
+    console.log('>>> handleDisconnected')
+    if (onDisconnect) onDisconnect()
+  })
+  
+  web3connect.on('accountChange', () => {
+    console.log('>>> handleAccountChanged')
+  })
+  
+  web3connect.on('chainChanged', () => {
+    console.log('>>> handleChainChanged')
+    const activeChain = web3connect.getNetworksId()
+    const activeChainId = activeChain.dicimalCachedId
+    if (onChainChange) onChainChange(activeChain.dicimalCachedId)
+  })
+  
+  await web3connect.onInit(async () => {
+    if (web3connect.hasCachedProvider()) {
+      const activeChain = web3connect.getNetworksId()
+      const activeChainId = activeChain.dicimalCachedId
+
       if (onSetActiveChain) onSetActiveChain(activeChainId)
 
-      if (`${activeChainId}` === `${needChainId}`) {
-        if (onSetActiveWeb3) onSetActiveWeb3(web3)
-        if (onConnected) onConnected(activeChainId, web3)
-      } else {
-        
-        const _onSwitch = () => {
-          console.log('>>> after switch', needChainId)
-          setupWeb3().then(async (afterSwitch) => {
-            console.log('>>> afterSwitch', afterSwitch)
-            if (`${afterSwitch.activeChainId}` === `${needChainId}`) {
-              await doConnectWithMetamask(options)
-            }
-          })
-        }
-        window.ethereum.once('networkChanged', _onSwitch)
-        try {
-          const isSwitched = await switchOrAddChain(needChainId)
-          console.log('>>> isSwitched', isSwitched)
-          if (isSwitched === false) {
-            if (onError) onError({ message: 'REJECT_SWITCH_NETWORK' })
-            return
-          }
-        } catch (err) {
-          if (onError) onError(err)
-        }
-        setTimeout(() => {
-          //_onSwitch()
-        }, 1000)
+      let _web3: EthereumProvider | false = false
+
+      try {
+        _web3 = web3connect.getWeb3()
+      } catch (err) {
+        web3connect.clearCache()
+        return
       }
-    }).catch((err) => {
-      if (onError) onError(err)
-    })
-  } catch (err) {
-    if (onError) onError(err)
-  }
+
+      if (onConnected) onConnected(activeChainId, _web3)
+    }
+    if (onReady) onReady()
+  })
 }
+
+const connectToProvider = (provider) => {
+  web3connect.connectTo(provider)
+}
+
+const getWeb3 = () => {
+  const _web3 = web3connect.getWeb3()
+  return _web3
+}
+
 
 const isMetamaskConnected = () => {
   if (window && window.ethereum) {
@@ -160,9 +221,11 @@ const isMetamaskConnected = () => {
 }
 
 const onBlockchainChanged = (callback) => {
+/*
   if (window && window.ethereum) {
     window.ethereum.on('networkChanged', callback)
   }
+*/
 }
 
 const onWalletChanged = (callback) => {
@@ -178,6 +241,7 @@ const onWalletChanged = (callback) => {
 }
 
 const getConnectedAddress = () => {
+/*
   if (window && window.ethereum) {
     return new Promise((resolve, reject) => {
       ethereum.request({
@@ -193,17 +257,21 @@ const getConnectedAddress = () => {
       })
     })
   } else return false
+  */
 }
 
 export {
   switchOrAddChain,
   onBlockchainChanged,
-  doConnectWithMetamask,
+  initWeb3Connector,
+  doDisconnectWallet,
   setupWeb3,
   isMetamaskConnected,
   getConnectedAddress,
   getCurrentChainId,
   onWalletChanged,
+  connectToProvider,
+  isWalletConnected
 }
 
 export default setupWeb3
