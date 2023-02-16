@@ -12,7 +12,9 @@ import {
   SimpleCell,
   IconButton,
   CellButton,
-  Alert
+  Alert,
+  Checkbox,
+  Placeholder
 } from '@vkontakte/vkui'
 
 import {
@@ -22,7 +24,8 @@ import {
   Icon24ArrowRightOutline,
   Icon24Chevron,
   Icon20CopyOutline,
-  Icon28DeleteOutline
+  Icon28DeleteOutline,
+  Icon56WalletOutline
 } from '@vkontakte/icons'
 import '@vkontakte/vkui/dist/vkui.css'
 
@@ -38,6 +41,9 @@ import { CHAIN_INFO } from "./helpers/constants"
 import { toWei, fromWei } from "./helpers/wei"
 import callNftMethod from "./helpers/callNftMethod"
 import fetchNFTInfo from "./helpers/fetchNFTInfo"
+
+const EVM_ADDRESS_REGEXP = /^0x[A-Fa-f0-9]{40}$/
+const isEvmAddress = (value) => typeof value === 'string' && EVM_ADDRESS_REGEXP.test(value)
 
 const App = () => {
 
@@ -218,6 +224,8 @@ const App = () => {
 
   const [ nftName, setNftName ] = useState(``)
   const [ nftDesc, setNftDesc ] = useState(``)
+  const [ nftOtherOwner, setNftOtherOwner ] = useState(false)
+  const [ nftOwner, setNftOwner ] = useState(``)
   
   useEffect(() => {
     let fileReader, isCancel = false
@@ -321,6 +329,7 @@ const App = () => {
   const doMintNFT = () => {
     if (nftName === ``) return
     if (nftImageDataBuffer === null) return
+    if (nftOtherOwner && !isEvmAddress(nftOwner)) return
     setPopout(
       <Alert
         actions={[
@@ -391,7 +400,7 @@ const App = () => {
           method: 'mint',
           weiAmount: nftInfo.NFTStakeInfo.mintOwnPrice,
           args: [
-            activeAddress,
+            (nftOtherOwner) ? nftOwner : activeAddress,
             `ipfs://${jsonCID}`
           ],
           onSuccess: () => {
@@ -462,7 +471,7 @@ const App = () => {
     setActivePanel(panelId)
   }
 
-  const mintDisabled = (nftName === ``) || (nftImageDataBuffer === null)
+  const mintDisabled = (nftName === ``) || (nftImageDataBuffer === null) || (nftOtherOwner && !isEvmAddress(nftOwner))
 
 	return (
 		<ConfigProvider>
@@ -475,10 +484,16 @@ const App = () => {
                   <PanelHeader>Создание NFT токена</PanelHeader>
                 </Panel>
                 <Panel id='switchNetwork'>
-                  <PanelHeader>Нужно сменить активную сеть</PanelHeader>
-                  <Div>
-                    <Button onClick={handleSwitchNetwork}>Сменить сеть</Button>
-                  </Div>
+                  <PanelHeader>Подключение крипто-кошелька</PanelHeader>
+                  <Group>
+                    <Placeholder
+                      icon={<Icon56WalletOutline />}
+                      header="Не верная сеть блокчейна"
+                      action={<Button size="m" onClick={handleSwitchNetwork}>Сменить сеть</Button>}
+                    >
+                      Приложение работает на блокчейне <strong>{mintChainInfo.chainName} ({mintChainInfo.chainId})</strong>
+                    </Placeholder>
+                  </Group>
                 </Panel>
                 <Panel id='connectWallet'>
                   <PanelHeader>Подключение крипто-кошелька</PanelHeader>
@@ -497,7 +512,7 @@ const App = () => {
                     <Group>
                       <SimpleCell
                         onClick={() => { if (activeAddress) goTo('walletInfo') }}
-                        before={<Avatar size={48} fallbackIcon={<Icon28Users />} src="#" />}
+                        before={<Icon56WalletOutline />}
                         subtitle={accountBalanceFetching
                           ? `Загрузка баланса`
                           : `Баналс: ${fromWei(accountBalance, mintChainInfo.nativeCurrency.decimals)} ${mintChainInfo.nativeCurrency.symbol}`
@@ -558,6 +573,26 @@ const App = () => {
                             onChange={(e) => { setNftDesc(e.target.value) }}
                           />
                         </FormItem>
+                        <FormItem>
+                          <Checkbox checked={nftOtherOwner} onChange={(e) => { setNftOtherOwner(!nftOtherOwner) }}>
+                            Отправить NFT, как подарок
+                          </Checkbox>
+                        </FormItem>
+                        {nftOtherOwner && (
+                          <FormItem
+                            top="Адрес получателя"
+                            status={isEvmAddress(nftOwner) ? 'valid' : 'error'}
+                            bottom={
+                              isEvmAddress(nftOwner) ? null : `Укажите коректный адрес получателя`
+                            }
+                          >
+                            <Input
+                              value={nftOwner}
+                              onChange={(e) => { setNftOwner(e.target.value) }}
+                              placeholder="0x..."
+                            />
+                          </FormItem>
+                        )}
                         <FormItem>
                           <Button disabled={mintDisabled} size="l" stretched onClick={doMintNFT}>
                             Создать NFT
