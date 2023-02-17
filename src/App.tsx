@@ -317,6 +317,8 @@ const App = () => {
   const [ isJsonUploadError, setIsJsonUploadError ] = useState(false)
   const [ jsonUploadedCID, setJsonUploadedCID ] = useState(false)
 
+  const [ nftRulesOn, setNftRulesOn ] = useState(false)
+  
   const [ mintTx, setMintTx ] = useState(false)
   const [ isMintShow, setIsMintShow ] = useState(false)
   
@@ -335,12 +337,14 @@ const App = () => {
     setNftImage(null)
     setNftImageData(null)
     setNftImageDataBuffer(null)
+    setNftRulesOn(false)
   }
 
   const doMintNFT = () => {
     if (nftName === ``) return
     if (nftImageDataBuffer === null) return
     if (nftOtherOwner && !isEvmAddress(nftOwner)) return
+    if (!nftRulesOn) return
     if (new BigNumber(accountBalance).isGreaterThan(0)) {
       setPopout(
         <Alert
@@ -461,7 +465,11 @@ const App = () => {
           name: nftName,
           description: nftDesc,
           image: `ipfs://${imageCid}`,
+          _vkmpnft_creator_id: (fetchedUser?.id) ? fetchedUser.id : 0,
+          _vkmpnft_creator: activeAddress,
+          _vkmpnft_timestamp: new Date().toString()
         }
+        console.log('>>> metadata', json, fetchedUser)
         setIsImageUpload(false)
         setIsImageUploaded(true)
         setIsJsonUpload(true)
@@ -588,7 +596,7 @@ const App = () => {
     setActivePanel(panelId)
   }
 
-  const mintDisabled = (nftName === ``) || (nftImageDataBuffer === null) || (nftOtherOwner && !isEvmAddress(nftOwner))
+  const mintDisabled = (nftName === ``) || (nftImageDataBuffer === null) || (nftOtherOwner && !isEvmAddress(nftOwner)) || !nftRulesOn
 
 	return (
 		<ConfigProvider>
@@ -631,6 +639,7 @@ const App = () => {
                       }
                     </Button>
                   </Div>
+                  {/*
                   <Div>
                     <Button onClick={connectWithWalletConnect}>
                       {isWalletConecting
@@ -639,6 +648,7 @@ const App = () => {
                       }
                     </Button>
                   </Div>
+                  */}
                 </Panel>
                 <Panel id='mintNFT'>
                   <PanelHeader>Создание NFT токена</PanelHeader>
@@ -735,6 +745,16 @@ const App = () => {
                           ) : (
                             <span>Расчет стоимости</span>
                           )}
+                        </FormItem>
+                        <FormItem
+                          top="В случае нарушения правил сервиса, администрация оставляет за собой право анулировать в NFT (сделать BURN) и заблокировать ваш аккаунт"
+                        >
+                          <Checkbox checked={nftRulesOn} onChange={(e) => { setNftRulesOn(!nftRulesOn) }}>
+                            Прочитал и согласен с&nbsp;
+                            <Link href="https://dev.vk.com/user-agreement" target="_blank">
+                              пользовательским соглашением <Icon24ExternalLinkOutline width={16} height={16} />
+                            </Link>
+                          </Checkbox>
                         </FormItem>
                         <FormItem>
                           <Button disabled={mintDisabled} size="l" stretched onClick={doMintNFT}>
